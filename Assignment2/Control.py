@@ -206,6 +206,8 @@ class CPU_Controller:
             # block the main thread for <interval> seconds
             x = range(len(cpu_usage_avg_arr))
             plt.hlines(set_point, x[0], len(cpu_usage_avg_arr))
+            plt.hlines(self.cpu_lower_threshold, x[0], len(cpu_usage_avg_arr))
+            plt.hlines(self.cpu_upper_threshold, x[0], len(cpu_usage_avg_arr))
             plt.plot(x, cpu_usage_avg_arr)
             plt.savefig("images.png")
             time.sleep(interval)
