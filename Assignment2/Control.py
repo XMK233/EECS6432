@@ -41,7 +41,6 @@ def scale(service, replicas, direction = 0):
         print("scaling up to %d"%(replicas))
     else:
         print("scale down to %d"%(replicas))
-    '''print("scaling triggered...")'''
 
     # get the service - we need the version of the service object
     with urlopen("http://{manager}/services/{service}".format(manager=manager, service=service["name"]),) as url:    # just an "s", would that make difference?
@@ -58,8 +57,8 @@ def scale(service, replicas, direction = 0):
                                                                                                 version=version),
                           data=json.dumps(spec))
         if r.status_code == 200:
-            print("after scaling: ")
-            get_tasks(service, 2)
+            print("scale completed. ")
+            get_tasks(service)
         else:
             print(r.reason, r.text)
 
@@ -183,7 +182,7 @@ class CPU_Controller:
                                                                                       high=self.cpu_upper_threshold * 100))
 
             scale_num = pid.output(interval, set_point, cpu_usage_avg, cpu_usage_avg_prev, cpu_usage_avg_arr)
-            '''print("Scale parameter value: ", scale_num)'''
+            print("Scale parameter value: ", scale_num)
 
             #print("-------------")
 
@@ -264,8 +263,8 @@ for service_name, service in services.items():
     get_tasks(service, 1)
 ''''''
 cpu0 = CPU_Controller(services, "web-worker", 0.1, 0.5)
-pid_for_cpu0 = PID(1, 1, 1, 15)
+pid_for_cpu0 = PID(1.5, 0.6, 0.1, 15)
 cpu0.control(pid_for_cpu0, time_interval)
 
 # force scaling
-scale(services["web-worker"], 3, -1)   
+scale(services["web-worker"], 10, 1)
