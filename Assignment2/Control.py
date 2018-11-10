@@ -268,4 +268,4 @@ pid_for_cpu0 = PID(1, 1, 1, 15)
 cpu0.control(pid_for_cpu0, time_interval)
 
 # force scaling
-scale(services["web-worker"], 3, -1)
+scale(services["web-worker"], 3, -1)   
