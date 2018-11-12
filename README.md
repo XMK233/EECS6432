@@ -6,6 +6,6 @@ an dalao changed a little bit. The Function is almost perfect, especially the PI
 I just made the code looks more object-oriented like. 
 And I added a graph. 
 
-That's all. 
+That's all for now. 
 
 
