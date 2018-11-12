@@ -4,7 +4,7 @@ import time
 from urllib.request import urlopen
 
 # here we assume you tunneled port 4000 of all swarm nodes to ports on your local machine
-nodes_list = ["192.168.56.103:4000", "192.168.56.104", "192.168.99.101:4000"]
+nodes_list = ["192.168.56.103:4000", "192.168.56.104:4000", "192.168.99.101:4000"]
 
 # the address your managers nodes REST API is listening
 manager = "192.168.99.101:4000"

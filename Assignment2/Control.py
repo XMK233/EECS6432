@@ -94,12 +94,12 @@ class PID:
         print("Output Proportional Controller: {0}".format(output_proportional_controller))
 
         # Integral gain (using last five cpu usages) -> Sum
-        output_integral_controller = self.integral_gain * (sum(history_values[-interval:]) * interval)
+        output_integral_controller = self.integral_gain * ((5 * set_point - sum(history_values[-5:])) * interval)
         print("Output Integral Controller: {0}".format(output_integral_controller))
 
         # Derivative gain: (e(k)-e(k-1))/T
         output_derivative_controller = self.derivative_gain * (
-                e(set_point, current_value) - e(set_point, last_value) / interval)
+            (e(set_point, current_value) - e(set_point, last_value)) / interval)
         print("Output Derivative Controller: {0}".format(output_derivative_controller))
 
         controller_output = abs(
@@ -112,7 +112,7 @@ class PID:
         elif controller_output > self.scale_bound:
             scale_num = self.scale_bound
         else:
-            scale_num = 1
+            scale_num = 0
 
         return scale_num
 
@@ -146,10 +146,11 @@ class CPU_Controller:
         # running value(s)
         cpu_usage_avg_prev = None
         cpu_usage_avg_arr = []
+        task_numbers = []
 
         set_point = (self.cpu_upper_threshold + self.cpu_lower_threshold) / 2
 
-        #plt.ion()
+        round = 0
 
         while True:
 
@@ -157,7 +158,8 @@ class CPU_Controller:
 
             # set which service you want to analyze.
             service_in_analysis_name = self.service_name
-            print("-----------------------new round-----------------")
+            print("-----------------------round: %d-----------------" %(round))
+            round += 1
             get_tasks(self.services[service_in_analysis_name])
 
             for task in self.services[service_in_analysis_name]["tasks"]:
@@ -190,6 +192,8 @@ class CPU_Controller:
 
             get_tasks(self.services[service_in_analysis_name])
             task_count = len(self.services[service_in_analysis_name]["tasks"])
+            task_numbers.append(task_count)
+            print("The number of the task(s): %d" %(task_count))
 
             if cpu_usage_avg > self.cpu_upper_threshold:
                 # scale up
@@ -197,22 +201,44 @@ class CPU_Controller:
 
             elif cpu_usage_avg < self.cpu_lower_threshold:
                 # scale down
-                if task_count > 1:
+                if task_count > scale_num:
                     scale(self.services[service_in_analysis_name], task_count - scale_num, direction=-1)
+                else:
+                    scale(self.services[service_in_analysis_name], 1, direction=-1)
             else:  # do nothing
                 pass
 
             # block the main thread for <interval> seconds
-            x = range(len(cpu_usage_avg_arr))
+            '''x = range(len(cpu_usage_avg_arr))
             plt.hlines(set_point, x[0], len(cpu_usage_avg_arr))
             plt.hlines(self.cpu_lower_threshold, x[0], len(cpu_usage_avg_arr))
             plt.hlines(self.cpu_upper_threshold, x[0], len(cpu_usage_avg_arr))
-            plt.plot(x, cpu_usage_avg_arr)
+            plt.plot(x, cpu_usage_avg_arr)'''
+
+
+
+            fig, ax1 = plt.subplots()
+            t = range(len(cpu_usage_avg_arr))
+            ax1.set_xlabel('time (s)')
+            ###
+            ax1.plot(t, cpu_usage_avg_arr, 'b-')
+            ax1.set_ylabel('cpu usage average', color='b')
+            ax1.tick_params('y', colors='b')
+            ###
+            ax2 = ax1.twinx()
+            ax2.plot(t, task_numbers, 'r.')
+            ax2.set_ylabel('number of tasks', color='r')
+            ax2.tick_params('y', colors='r')
+            ###
+            ax1.hlines(set_point, t[0], len(cpu_usage_avg_arr))
+            ax1.hlines(self.cpu_lower_threshold, t[0], len(cpu_usage_avg_arr))
+            ax1.hlines(self.cpu_upper_threshold, t[0], len(cpu_usage_avg_arr))
+            ###
             plt.savefig("images.png")
+            plt.close()
+
+
             time.sleep(interval)
-
-
-
 ############################################################################################################
 #####   Operating Zone   #######################
 
@@ -234,7 +260,7 @@ derivative_gain = int(input("Enter a number for Kd: "))'''
 
 # time interval between each avg cpu usage calculations
 '''interval = int(input("Enter a number for the interval: "))'''
-time_interval = 5
+time_interval = 1
 
 # get all NodeIDs in swarm
 nodes = {}
@@ -262,9 +288,9 @@ with urlopen("http://{manager}/services".format(manager=manager)) as url:
 for service_name, service in services.items():
     get_tasks(service, 1)
 ''''''
-cpu0 = CPU_Controller(services, "web-worker", 0.1, 0.5)
-pid_for_cpu0 = PID(1.5, 0.6, 0.1, 15)
+cpu0 = CPU_Controller(services, "web-worker", 0.1, 0.2)
+pid_for_cpu0 = PID(3, 1.5, 3, 15)
 cpu0.control(pid_for_cpu0, time_interval)
 
 # force scaling
-scale(services["web-worker"], 10, 1)
+scale(services["web-worker"], 1, 1)
