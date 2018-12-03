@@ -1,3 +1,4 @@
+#knowing Y, want to know U
 import numpy as np
 
 # 2-D array: 1 x 1
@@ -12,9 +13,9 @@ X = np.array([[3]])
 Y_next = np.array([[4]])
 
 X_next = np.dot(np.linalg.pinv(C), Y_next)
-print('X_next: ')
+print('X_next:')
 print(X_next)
 
 U = np.dot(np.linalg.pinv(B), X_next - np.dot(A, X))
-print('U: ')
+print('U:')
 print(U)
