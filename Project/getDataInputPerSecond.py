@@ -1,6 +1,6 @@
 import json
 import requests
-import time
+import time, datetime
 from urllib.request import urlopen
 
 # here we assume you tunneled port 4000 of all swarm nodes to ports on your local machine
@@ -16,20 +16,29 @@ cpu_lower_threshold = 0.2
 # time interval between each avg cpu usage calculations
 interval = 5
 
-# this is taken directly from docker client:
-#   https://github.com/docker/docker/blob/28a7577a029780e4533faf3d057ec9f6c7a10948/api/client/stats.go#L309
-def calculate_cpu_percent(d):
-    cpu_count = len(d["cpu_stats"]["cpu_usage"]["percpu_usage"])
-    cpu_percent = 0.0
-    cpu_delta = float(d["cpu_stats"]["cpu_usage"]["total_usage"]) - \
-                float(d["precpu_stats"]["cpu_usage"]["total_usage"])
-    system_delta = float(d["cpu_stats"]["system_cpu_usage"]) - \
-                   float(d["precpu_stats"]["system_cpu_usage"])
-    if system_delta > 0.0:
-        cpu_percent = cpu_delta / system_delta * cpu_count #* 100.0
+def calculate_data_incoming_rate(service):
+    ars = []
+    for task in service["tasks"]:
 
-    print(cpu_percent)
-    return cpu_percent
+        t1 = datetime.datetime.now()
+        d1 = 0
+        with urlopen('http://{node}/containers/{containerID}/stats?stream=false'.format(
+                node=nodes[task["NodeID"]], containerID=task["ContainerID"])) as url:
+            data = json.loads(url.read().decode())
+
+            d1 = data["networks"]["eth0"]["rx_bytes"] + data["networks"]["eth1"]["rx_bytes"] + data["networks"]["eth2"]["rx_bytes"]
+
+        t2 = datetime.datetime.now()
+        d2 = 0
+        with urlopen('http://{node}/containers/{containerID}/stats?stream=false'.format(
+                node=nodes[task["NodeID"]], containerID=task["ContainerID"])) as url:
+            data = json.loads(url.read().decode())
+            d2 = data["networks"]["eth0"]["rx_bytes"] + data["networks"]["eth1"]["rx_bytes"] + data["networks"]["eth2"][
+                "rx_bytes"]
+
+        ar = (d2 - d1)/(t2 - t1)
+        ars.append(ar)
+    return sum(ars)/ float(len(ars))
 
 # get_tasks functions gets a service in the form of {"name": <service-name>, "tasks": []} and fills the tasks.
 def get_tasks(service):
@@ -47,29 +56,6 @@ def get_tasks(service):
             node_id = task["NodeID"]
             service["tasks"].append({"ContainerID": container_id, "NodeID": node_id})
             print('''\t ContainerID: {}, NodeID: {} '''.format(container_id, node_id))
-
-# scale functions gets a service in the form of {"name": <service-name>, "tasks": []} and number of desired replicas
-# and update the service accordingly
-def scale(service, replicas):
-    print("scaling triggered...")
-    # get the service - we need the version of the service object
-    with urlopen("http://{manager}/services/{service}".format(manager=manager, service=service["name"])) as url:
-        data = json.loads(url.read().decode())
-        version = data["Version"]["Index"]
-
-        # the whole spec object should be sent to the update API,
-        # otherwise the missing values will be replaced by default values
-        spec = data["Spec"]
-        spec["Mode"]["Replicated"]["Replicas"] = replicas
-
-        r = requests.post("http://{manager}/services/{service}/update?version={version}".format(manager=manager,
-                                                                                                service=service["name"],
-                                                                                                version=version),
-                          data=json.dumps(spec))
-        if r.status_code == 200:
-            get_tasks(service)
-        else:
-            print(r.reason, r.text)
 
 # get all NodeIDs in swarm
 if __name__ == '__main__':
@@ -99,28 +85,7 @@ if __name__ == '__main__':
     for service_name, service in services.items():
         get_tasks(service)
 
-    # cpu usage api is not fast. be patient!
-    # here we consistently get the cpu usage of all the web-workers and calculate the average
-
     while True:
-        cpu_useges = []
-
-        # it can be whatever metrics you interested in
-        # x_usages = []
-
-        for task in services["web-worker"]["tasks"]:
-            with urlopen('http://{node}/containers/{containerID}/stats?stream=false'.format(
-                    node=nodes[task["NodeID"]], containerID=task["ContainerID"])) as url:
-                data = json.loads(url.read().decode())
-                cpu_useges.append(calculate_cpu_percent(data))
-                # x_usages.append(calculate_x(data))
-
-        cpu_usage_avg = sum(cpu_useges) / len(cpu_useges)
-        # x_usage_avg = sum(x_useges) / len(x_useges)
-
-        print("CPU Usage (avg): {0:.2f}%".format(cpu_usage_avg * 100))
-
-        # put the code for scaling up and down based on metrics x here.
-
-        # block the main thread for <interval> seconds
+        t = calculate_data_incoming_rate(services["web-worker"])
+        print(t)
         time.sleep(2)
