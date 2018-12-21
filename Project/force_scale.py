@@ -69,10 +69,10 @@ def scale(service, replicas, direction = 0):
 
 
 # here we assume you tunneled port 4000 of all swarm nodes to ports on your local machine
-nodes_list = ["192.168.56.103:4000", "192.168.56.104:4000", "192.168.56.101:4000"]
+nodes_list = ["192.168.56.103:4000", "192.168.56.104:4000", "192.168.56.105:4000"]
 
 # the address your managers nodes REST API is listening
-manager = "192.168.56.101:4000"
+manager = "192.168.56.105:4000"
 
 time_interval = 1
 
@@ -103,4 +103,4 @@ for service_name, service in services.items():
     get_tasks(service, 1)
 
 # force scaling
-scale(services["mysql"], 3, 1)
+scale(services["web-worker"], 1, 1)

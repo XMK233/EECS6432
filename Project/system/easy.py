@@ -44,37 +44,26 @@ if __name__ == '__main__':
 
             CtnNum = settings.get_tasks(services["web-worker"])
             print("Originally, this tier has %d containers" %(CtnNum))
-            f.write("Originally, this tier has %d containers" %(CtnNum) + "\n")
+            f.write("Originally, this tier has %d containers" %(CtnNum))
 
             Uw_cpu = getMetrics.calculate_cpu_utilization(nodes, services["web-worker"])
             print("CPU Usage (avg): {0:.2f}%".format(Uw_cpu * 100))
             f.write("CPU Usage (avg): {0:.2f}%".format(Uw_cpu * 100) + "\n")
 
-            Xw = getMetrics.calculate_data_incoming_rate(nodes, services["web-worker"])
-            print("average data arrival rate: %f Kb/s\n" % (Xw))
-            f.write("average data arrival rate: %f Kb/s\n" % (Xw) + "\n")
-#-----------------------------------------------
-            if Xw == float(0):
-                mtp = 1
-            else:
-                mtp = abs(Xw*R_-Uw_cpu)/(Xw*R_*Uw_cpu)
-
-            print("new number of containers should be %f x" %(mtp))
-            f.write("new number of containers should be %f x" %(mtp) + "\n")
-
-            NewCtnNum = round(CtnNum / math.sqrt(mtp))
-            print("--> Given the utilization here, we want new number of containers in this tier to be (U/(1-U)/R_): ", NewCtnNum)
-            f.write("--> Given the utilization here, we want new number of containers in this tier to be (U/(1-U)/R_): %d" %(NewCtnNum) + "\n")
+            NewCtnNum = round(CtnNum * math.pow(2, 2*(Uw_cpu/0.5-1)))
+            print("--> Given the utilization here, we want new number of containers in this tier to be round(CtnNum * math.pow(2, 2*Uw_cpu/0.5-1)): ", NewCtnNum)
+            f.write("--> Given the utilization here, we want new number of containers in this tier to be round(CtnNum * math.pow(2, 2*Uw_cpu/0.5-1)): %d" %(NewCtnNum) + "\n")
 
             NewCtnNum = min(NewCtnNum, 15)
 
             if Uw_cpu > 0.6 and NewCtnNum > CtnNum:
                 settings.scale(services["web-worker"], NewCtnNum, 1)
-            elif Uw_cpu < 0.3 and NewCtnNum < CtnNum:
+            elif Uw_cpu < 0.4 and NewCtnNum < CtnNum:
                 if NewCtnNum>0:
                     settings.scale(services["web-worker"], NewCtnNum, -1)
                 else:
                     settings.scale(services["web-worker"], 1, -1)
+
 
             '''print("database: ")
             print("CPU Usage (avg): {0:.2f}%".format(
