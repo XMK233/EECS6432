@@ -39,7 +39,7 @@ if __name__ == '__main__':
     # here we consistently get the cpu usage of all the web-workers and calculate the average
 
     R_ = settings.target_response_time
-    time_limit = datetime.timedelta(seconds=600)
+    time_limit = datetime.timedelta(seconds=3000)
     start_time = datetime.datetime.now()
     print("let's get started")
 
@@ -52,14 +52,14 @@ if __name__ == '__main__':
         newctnnum = []
         actctnnum = []
 
+        f.write("CtnNum,Uw_cpu,Xw,mtp,NewCtnNum,ActNewCtnNum\n")
+
         while True:
             print("======================web server: ==========================")
 
             now_time = datetime.datetime.now()
             if now_time - start_time >= time_limit:
                 break
-
-            f.write("CtnNum,Uw_cpu,Xw,mtp,NewCtnNum,ActNewCtnNum\n")
 
             CtnNum = settings.get_tasks(services["web-worker"])
             print("Originally, this tier has %d containers" %(CtnNum))
@@ -104,7 +104,7 @@ if __name__ == '__main__':
 #-----------------------------------------------------------------------------------
             fig, ax1 = plt.subplots()
             t = range(len(ctnnums))
-            ax1.set_xlabel('time (s)')
+            ax1.set_xlabel('#sample (s)')
             ###
             ax1.plot(t, ctnnums, 'b-')
             ax1.set_ylabel('#ctn', color='b')
@@ -120,7 +120,7 @@ if __name__ == '__main__':
             ax3.set_ylabel('Xw', color='g')
             ax3.tick_params('y', colors='g')
             ###
-            plt.savefig("images.png")
+            plt.savefig("images_%s.png" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")))
             plt.close()
 #______________________________________________________________________________________
-            time.sleep(5)
+            time.sleep(2)
