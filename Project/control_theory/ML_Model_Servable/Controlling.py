@@ -41,11 +41,12 @@ if __name__ == '__main__':
     # here we consistently get the cpu usage of all the web-workers and calculate the average
 
     R_ = settings.target_response_time
-    time_limit = datetime.timedelta(seconds=600)
+    time_limit = datetime.timedelta(seconds=3600)
     start_time = datetime.datetime.now()
+    version_interval = datetime.timedelta(seconds=600)
     print("let's get started")
 
-    with open("ML_dataop-pi_data-gathering_%s.csv" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")), "w") as f:
+    with open("ML_dataop-pi_data-gathering_start--%s.csv" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")), "w") as f:
 
         ctnnums = []
         uw_cpus = []
@@ -55,28 +56,44 @@ if __name__ == '__main__':
         actctnnum = []
         rs = []
 
+        last_checkpoint = start_time
         f.write("CtnNum,Uw_cpu,Xw,mtp,NewCtnNum,ActNewCtnNum\n")
+
+        f_version = open("ML_dataop-pi_data-gathering_version--%s.csv" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")))
+        f_version.write("CtnNum,Uw_cpu,Xw,mtp,NewCtnNum,ActNewCtnNum\n")
 
         while True:
             print("======================web server: ==========================")
 
             now_time = datetime.datetime.now()
             if now_time - start_time >= time_limit:
+                f_version.close()
                 break
+
+            now = datetime.datetime.now()
+            if now - last_checkpoint >= version_interval:
+                last_checkpoint = now
+                f_version.close()
+                f_version.open(
+                    "ML_dataop-pi_data-gathering_version--%s.csv" % (last_checkpoint.strftime("%Y-%m-%d_%H-%M-%S")))
+                pass
 
             CtnNum = settings.get_tasks(services["web-worker"])
             print("Originally, this tier has %d containers" %(CtnNum))
             f.write(str(CtnNum) + ",")
+            f_version.write(str(CtnNum) + ",")
             ctnnums.append(CtnNum)
 
             Uw_cpu = getMetrics.calculate_cpu_utilization(nodes, services["web-worker"])
             print("CPU Usage (avg): {0:.2f}%".format(Uw_cpu * 100))
             f.write(str(Uw_cpu) + ",")
+            f_version.write(str(Uw_cpu) + ",")
             uw_cpus.append(Uw_cpu)
 
             Xw = getMetrics.calculate_data_incoming_rate(nodes, services["web-worker"])
             print("average data arrival rate: %f Kb/s\n" % (Xw))
             f.write(str(Xw) + "\n")
+            f_version.write(str(Xw) + "\n")
             xws.append(Xw)
 
             rs.append(Uw_cpu / (Xw * (1 - Uw_cpu)) if Xw != 0 else 0)
