@@ -7,6 +7,7 @@ import datetime
 import math   # This will import math module
 import settings, getMetrics
 import matplotlib.pyplot as plt
+import random
 
 if __name__ == '__main__':
     # get all NodeIDs in swarm
@@ -39,68 +40,52 @@ if __name__ == '__main__':
     # here we consistently get the cpu usage of all the web-workers and calculate the average
 
     R_ = settings.target_response_time
-    time_limit = datetime.timedelta(seconds=3000)
+    time_limit = datetime.timedelta(seconds=300)
     start_time = datetime.datetime.now()
     print("let's get started")
 
-    with open("dataop-pi_data-gathering_%s.csv" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")), "w") as f:
+    with open("dataop\\pi\\%s.csv" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")), "w") as f:
 
         ctnnums = []
         uw_cpus = []
         xws = []
+        res = []
         mtps = []
         newctnnum = []
         actctnnum = []
 
-        f.write("CtnNum,Uw_cpu,Xw,mtp,NewCtnNum,ActNewCtnNum\n")
+        f.write("CtnNum,Uw_cpu,Xw,Res\n")
 
         while True:
-            print("======================web server: ==========================")
+            #print("======================web server: ==========================")
 
             now_time = datetime.datetime.now()
             if now_time - start_time >= time_limit:
                 break
 
             CtnNum = settings.get_tasks(services["web-worker"])
-            print("Originally, this tier has %d containers" %(CtnNum))
+            #print("Originally, this tier has %d containers" %(CtnNum))
             f.write(str(CtnNum) + ",")
             ctnnums.append(CtnNum)
 
             Uw_cpu = getMetrics.calculate_cpu_utilization(nodes, services["web-worker"])
-            print("CPU Usage (avg): {0:.2f}%".format(Uw_cpu * 100))
+            #print("CPU Usage (avg): {0:.2f}%".format(Uw_cpu * 100))
             f.write(str(Uw_cpu) + ",")
             uw_cpus.append(Uw_cpu)
 
             Xw = getMetrics.calculate_data_incoming_rate(nodes, services["web-worker"])
-            print("average data arrival rate: %f Kb/s\n" % (Xw))
+            #print("average data arrival rate: %f Kb/s" % (Xw))
             f.write(str(Xw) + ",")
             xws.append(Xw)
+
+            Res = getMetrics.calculate_requests_responseTime_pi()
+            #print("response time of /dataop/pi is: %f\n" % (Res))
+            f.write(str(Res) + "\n")
+            res.append(Res)
+            print("%f,%f,%f,%f" %(CtnNum, Uw_cpu, Xw, Res) )
 #-----------------------------------------------
-            if Xw == float(0):
-                mtp = 4
-            else:
-                mtp = abs(Xw*R_-Uw_cpu)/(Xw*R_*Uw_cpu)
-            print("new number of containers should be %f x." %(mtp))
-            f.write(str(mtp) + ",")
-            mtps.append(mtp)
-
-            NewCtnNum = round(CtnNum / math.sqrt(mtp))#
-            print("--> Given the utilization here, we want new number of containers in this tier to be: ", NewCtnNum)
-            f.write(str(NewCtnNum) + ",")
-            newctnnum.append(NewCtnNum)
-
-            ActNewCtnNum = min(NewCtnNum, 15)
-            print("--> but actually, we scale the number of containers to be ", ActNewCtnNum)
-            f.write(str(ActNewCtnNum) + "\n")
-            actctnnum.append(ActNewCtnNum)
-
-            if Uw_cpu > 0.15 and ActNewCtnNum > CtnNum:
-                settings.scale(services["web-worker"], ActNewCtnNum, 1)
-            elif Uw_cpu < 0.1 and ActNewCtnNum < CtnNum:
-                if ActNewCtnNum>0:
-                    settings.scale(services["web-worker"], ActNewCtnNum, -1)
-                else:
-                    settings.scale(services["web-worker"], 1, -1)
+            ActNewCtnNum = random.randint(1, 10)
+            settings.scale(services["web-worker"], ActNewCtnNum, 1)
 #-----------------------------------------------------------------------------------
             fig, ax1 = plt.subplots()
             t = range(len(ctnnums))
@@ -120,7 +105,12 @@ if __name__ == '__main__':
             ax3.set_ylabel('Xw', color='g')
             ax3.tick_params('y', colors='g')
             ###
-            plt.savefig("images_%s.png" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")))
+            ax4 = ax1.twinx()
+            ax4.plot(t, res, 'g-')
+            ax4.set_ylabel('Res', color='c')
+            ax4.tick_params('y', colors='c')
+            ###
+            plt.savefig("images\\%s.png" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")))
             plt.close()
 #______________________________________________________________________________________
-            time.sleep(2)
+            time.sleep(20)

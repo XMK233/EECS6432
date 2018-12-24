@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-import json
-import requests
-import time
+import pandas as pd
+import sys
+sys.path.append("..")
+import settings, getMetrics
+import json, requests, time
 from urllib.request import urlopen
 import datetime
 import math   # This will import math module
-import settings, getMetrics
 import matplotlib.pyplot as plt
+import random
 
 if __name__ == '__main__':
     # get all NodeIDs in swarm
@@ -39,11 +41,11 @@ if __name__ == '__main__':
     # here we consistently get the cpu usage of all the web-workers and calculate the average
 
     R_ = settings.target_response_time
-    time_limit = datetime.timedelta(seconds=3000)
+    time_limit = datetime.timedelta(seconds=600)
     start_time = datetime.datetime.now()
     print("let's get started")
 
-    with open("dataop-pi_data-gathering_%s.csv" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")), "w") as f:
+    with open("ML_dataop-pi_data-gathering_%s.csv" %(start_time.strftime("%Y-%m-%d_%H-%M-%S")), "w") as f:
 
         ctnnums = []
         uw_cpus = []
@@ -51,6 +53,7 @@ if __name__ == '__main__':
         mtps = []
         newctnnum = []
         actctnnum = []
+        rs = []
 
         f.write("CtnNum,Uw_cpu,Xw,mtp,NewCtnNum,ActNewCtnNum\n")
 
@@ -73,18 +76,18 @@ if __name__ == '__main__':
 
             Xw = getMetrics.calculate_data_incoming_rate(nodes, services["web-worker"])
             print("average data arrival rate: %f Kb/s\n" % (Xw))
-            f.write(str(Xw) + ",")
+            f.write(str(Xw) + "\n")
             xws.append(Xw)
-#-----------------------------------------------
-            if Xw == float(0):
-                mtp = 4
-            else:
-                mtp = abs(Xw*R_-Uw_cpu)/(Xw*R_*Uw_cpu)
-            print("new number of containers should be %f x." %(mtp))
-            f.write(str(mtp) + ",")
-            mtps.append(mtp)
 
-            NewCtnNum = round(CtnNum / math.sqrt(mtp))#
+            rs.append(Uw_cpu / (Xw * (1 - Uw_cpu)) if Xw != 0 else 0)
+
+            du = uw_cpus[-1] - uw_cpus[-2] if len(uw_cpus) > 1 else 0
+            dx = xws[-1] - xws[-2] if len(xws) > 1 else 0
+            dr = rs[-1] - R_
+
+#-----------------------------------------------
+
+            '''NewCtnNum = round(CtnNum / math.sqrt(mtp))#
             print("--> Given the utilization here, we want new number of containers in this tier to be: ", NewCtnNum)
             f.write(str(NewCtnNum) + ",")
             newctnnum.append(NewCtnNum)
@@ -92,7 +95,16 @@ if __name__ == '__main__':
             ActNewCtnNum = min(NewCtnNum, 15)
             print("--> but actually, we scale the number of containers to be ", ActNewCtnNum)
             f.write(str(ActNewCtnNum) + "\n")
-            actctnnum.append(ActNewCtnNum)
+            actctnnum.append(ActNewCtnNum)'''
+
+            request_data = {"instances": [[du, dx, dr]]}
+            url = "http://scale05.eecs.yorku.ca:8502/v1/models/ctnnum_model:predict"
+            r = requests.post(url, json=request_data)
+            NewCtnNum = math.ceil(json.loads(r.text)["predictions"][0][0])
+            ActNewCtnNum = 1 if CtnNum + NewCtnNum <= 0 else CtnNum + NewCtnNum
+            ActNewCtnNum = min(ActNewCtnNum, 5)
+
+            print(request_data, ActNewCtnNum)
 
             if Uw_cpu > 0.15 and ActNewCtnNum > CtnNum:
                 settings.scale(services["web-worker"], ActNewCtnNum, 1)
